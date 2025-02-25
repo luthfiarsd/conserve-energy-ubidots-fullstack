@@ -1,67 +1,43 @@
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
 import datetime
-import os
 
 app = Flask(__name__)
 
-# MongoDB Connection (gunakan environment variable untuk keamanan)
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://luthfiarsd:GyXK1DijUOuWDpfA@assignment-2.ptg7p.mongodb.net/")
-client = MongoClient(MONGO_URI)
-db = client["ubidots"]
-collection = db["sensor"]
+# Konfigurasi MongoDB
+client = MongoClient("mongodb://localhost:27017/")
+db = client["iot_database"]
+collection = db["sensor_data"]
 
-# Endpoint untuk menerima data suhu
-@app.route("/sensor/temperature", methods=["POST"])
-def receive_temperature():
+
+@app.route("/sensor", methods=["POST"])
+def receive_sensor_data():
+    if not request.is_json:
+        return jsonify({"error": "Invalid content type, must be application/json"}), 400
+
     data = request.get_json()
-    if not data or "temperature" not in data:
+    temperature = data.get("temperature")
+    humidity = data.get("humidity")
+
+    if temperature is None or humidity is None:
         return jsonify({"error": "Invalid data"}), 400
 
-    new_data = {
-        "temperature": data["temperature"],
+    sensor_data = {
+        "temperature": temperature,
+        "humidity": humidity,
         "timestamp": datetime.datetime.utcnow(),
     }
-    collection.insert_one(new_data)
-    return jsonify({"message": "Temperature data inserted successfully"}), 201
 
-# Endpoint untuk mendapatkan suhu rata-rata
-@app.route("/sensor/temperature/avg", methods=["GET"])
-def get_avg_temperature():
-    data = list(collection.find({"temperature": {"$exists": True}}, {"_id": 0, "temperature": 1}))
-    temperatures = [d["temperature"] for d in data]
+    collection.insert_one(sensor_data)
 
-    if not temperatures:
-        return jsonify({"average_temperature": None, "message": "No data"}), 404
+    return jsonify({"message": "Data received successfully"}), 200
 
-    avg_temperature = sum(temperatures) / len(temperatures)
-    return jsonify({"average_temperature": avg_temperature}), 200
 
-# Endpoint untuk menerima data kelembaban
-@app.route("/sensor/humidity", methods=["POST"])
-def receive_humidity():
-    data = request.get_json()
-    if not data or "humidity" not in data:
-        return jsonify({"error": "Invalid data"}), 400
+@app.route("/sensor_data", methods=["GET"])
+def get_sensor_data():
+    sensor_data = list(collection.find({}, {"_id": 0}))
+    return jsonify(sensor_data), 200
 
-    new_data = {
-        "humidity": data["humidity"],
-        "timestamp": datetime.datetime.utcnow(),
-    }
-    collection.insert_one(new_data)
-    return jsonify({"message": "Humidity data inserted successfully"}), 201
-
-# Endpoint untuk mendapatkan kelembaban rata-rata
-@app.route("/sensor/humidity/avg", methods=["GET"])
-def get_avg_humidity():
-    data = list(collection.find({"humidity": {"$exists": True}}, {"_id": 0, "humidity": 1}))
-    humidities = [d["humidity"] for d in data]
-
-    if not humidities:
-        return jsonify({"average_humidity": None, "message": "No data"}), 404
-
-    avg_humidity = sum(humidities) / len(humidities)
-    return jsonify({"average_humidity": avg_humidity}), 200
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

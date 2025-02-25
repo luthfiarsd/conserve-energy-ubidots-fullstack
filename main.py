@@ -3,16 +3,18 @@ import time
 from machine import Pin
 import dht
 from umqtt.simple import MQTTClient
+import urequests
 
 # Konfigurasi WiFi
 SSID = "Jatinangor Hari ini.."
 PASSWORD = "anjaymabar"
 
 # Konfigurasi Ubidots
-TOKEN = "BBUS-nmgXkbzfkaVBXhiUE7NpD4LbO4MAuZ"  # Ganti dengan Token API Ubidots
+TOKEN = "BBUS-nmgXkbzfkaVBXhiUE7NpD4LbO4MAuZ"
 DEVICE_LABEL = "esp32"
 VARIABLE_LABEL_TEMP = "temperature"
 VARIABLE_LABEL_HUMID = "humidity"
+API_URL = "http://192.168.196.191:5000/sensor"
 
 BROKER = "industrial.api.ubidots.com"
 TOPIC = b"/v1.6/devices/%s" % DEVICE_LABEL
@@ -33,12 +35,16 @@ print("WiFi Connected!")
 # Koneksi MQTT ke Ubidots
 client = MQTTClient("client_id", BROKER, user=TOKEN, password="")
 
+
 def send_data(temperature, humidity):
-    payload = '{"%s": %s, "%s": %s}' % (VARIABLE_LABEL_TEMP, temperature, VARIABLE_LABEL_HUMID, humidity)
+    payload = {VARIABLE_LABEL_TEMP: temperature, VARIABLE_LABEL_HUMID: humidity}
     client.connect()
-    client.publish(TOPIC, payload)
+    client.publish(TOPIC, str(payload))
     client.disconnect()
     print("Data terkirim:", payload)
+    response = urequests.post(API_URL, json=payload)
+    print("Yang terkirim di db", response)
+
 
 # Loop utama
 while True:

@@ -6,7 +6,7 @@ import os
 app = Flask(__name__)
 
 # MongoDB Connection (gunakan environment variable untuk keamanan)
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://your_username:your_password@cluster.mongodb.net/")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://luthfiarsd:GyXK1DijUOuWDpfA@assignment-2.ptg7p.mongodb.net/")
 client = MongoClient(MONGO_URI)
 db = client["ubidots"]
 collection = db["sensor"]

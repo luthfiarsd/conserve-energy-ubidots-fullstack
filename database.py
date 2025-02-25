@@ -1,42 +1,67 @@
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
 import datetime
+import os
 
 app = Flask(__name__)
 
-client = MongoClient("mongodb+srv://arukohazuraisu9863:NOctp5p85iuzz$ecluster0.arsy.mongodb.net/?retryWrites=true&w=majority")
-db = client["sic"]
+# MongoDB Connection (gunakan environment variable untuk keamanan)
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://your_username:your_password@cluster.mongodb.net/")
+client = MongoClient(MONGO_URI)
+db = client["ubidots"]
 collection = db["sensor"]
 
-@app.route("/sensor1/data", methods=["POST"])
-def add_sensor_data():
+# Endpoint untuk menerima data suhu
+@app.route("/sensor/temperature", methods=["POST"])
+def receive_temperature():
     data = request.get_json()
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
-
-    temperature = data.get("temperature")
-    kelembapan = data.get("kelembapan")
+    if not data or "temperature" not in data:
+        return jsonify({"error": "Invalid data"}), 400
 
     new_data = {
-        "temperature": temperature,
-        "kelembapan": kelembapan,
-        "timestamp": datetime.datetime.utcnow()
+        "temperature": data["temperature"],
+        "timestamp": datetime.datetime.utcnow(),
     }
+    collection.insert_one(new_data)
+    return jsonify({"message": "Temperature data inserted successfully"}), 201
 
-    result = collection.insert_one(new_data)
-
-    return jsonify({
-        "message": "Data inserted successfully",
-        "inserted_id": str(result.inserted_id)
-    }), 201
-
-@app.route("/sensor1/temperature/avg", methods=["GET"])
+# Endpoint untuk mendapatkan suhu rata-rata
+@app.route("/sensor/temperature/avg", methods=["GET"])
 def get_avg_temperature():
-    data = list(collection.find({}, {"_id": 0, "temperature": 1}))
+    data = list(collection.find({"temperature": {"$exists": True}}, {"_id": 0, "temperature": 1}))
+    temperatures = [d["temperature"] for d in data]
 
-    temperatures = [doc["temperature"] for doc in data if "temperature" in doc and doc["temperature"] is not None]
+    if not temperatures:
+        return jsonify({"average_temperature": None, "message": "No data"}), 404
 
-    if len(temperatures) == 0:
-        return jsonify({
-            "average_temperature": None,
-        })
+    avg_temperature = sum(temperatures) / len(temperatures)
+    return jsonify({"average_temperature": avg_temperature}), 200
+
+# Endpoint untuk menerima data kelembaban
+@app.route("/sensor/humidity", methods=["POST"])
+def receive_humidity():
+    data = request.get_json()
+    if not data or "humidity" not in data:
+        return jsonify({"error": "Invalid data"}), 400
+
+    new_data = {
+        "humidity": data["humidity"],
+        "timestamp": datetime.datetime.utcnow(),
+    }
+    collection.insert_one(new_data)
+    return jsonify({"message": "Humidity data inserted successfully"}), 201
+
+# Endpoint untuk mendapatkan kelembaban rata-rata
+@app.route("/sensor/humidity/avg", methods=["GET"])
+def get_avg_humidity():
+    data = list(collection.find({"humidity": {"$exists": True}}, {"_id": 0, "humidity": 1}))
+    humidities = [d["humidity"] for d in data]
+
+    if not humidities:
+        return jsonify({"average_humidity": None, "message": "No data"}), 404
+
+    avg_humidity = sum(humidities) / len(humidities)
+    return jsonify({"average_humidity": avg_humidity}), 200
+
+if __name__ == "__main__":
+    app.run(debug=True)
